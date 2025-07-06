@@ -1,4 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Note } from './entities/note.entity';
@@ -12,7 +15,7 @@ export class NoteService {
     private noteRepository: Repository<Note>,
   ) {}
 
-  create(createNoteDto: CreateNoteDto): Promise<Note> {
+  async create(createNoteDto: CreateNoteDto): Promise<Note> {
     const note = this.noteRepository.create(createNoteDto);
     return this.noteRepository.save(note);
   }
@@ -29,13 +32,29 @@ export class NoteService {
     return note;
   }
 
+  async findByTitle(title: string): Promise<Note | null> {
+    return this.noteRepository.findOneBy({ title });
+  }
+
   async update(id: number, updateNoteDto: UpdateNoteDto): Promise<Note> {
-    await this.noteRepository.update(id, updateNoteDto);
-    return this.findOne(id);
+    const note = await this.noteRepository.preload({
+      id,
+      ...updateNoteDto,
+    });
+
+    if (!note) {
+      throw new NotFoundException(`Cannot update. Note with id ${id} not found`);
+    }
+
+    return this.noteRepository.save(note);
   }
 
   async remove(id: number): Promise<void> {
-    await this.noteRepository.delete(id);
+    const result = await this.noteRepository.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Cannot delete. Note with id ${id} not found`);
+    }
   }
 }
+
 
